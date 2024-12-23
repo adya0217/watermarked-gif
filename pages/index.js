@@ -1,114 +1,109 @@
-import Image from "next/image";
-import { Geist, Geist_Mono } from "next/font/google";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+import { useState } from 'react';
+import axios from 'axios';
 
 export default function Home() {
-  return (
-    <div
-      className={`${geistSans.variable} ${geistMono.variable} grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]`}
-    >
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              pages/index.js
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [search, setSearch] = useState('');
+  const [gifs, setGifs] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+  const downloadGif = async (gif) => {
+    try {
+      const watermarkResponse = await axios.post('/api/watermark', {
+        imageUrl: gif.images.fixed_width_small.url,
+      }, {
+        timeout: 20000
+      });
+
+      const base64Data = watermarkResponse.data.watermarkedImage;
+
+      // Create and trigger download
+      const link = document.createElement('a');
+      link.href = base64Data;  // Use base64 data directly
+      link.download = `${gif.title || 'watermarked'}.gif`;
+      link.click();
+    } catch (error) {
+      console.error('Download error:', error);
+      alert('Failed to download GIF');
+    }
+  };
+
+  const searchGifs = async (e) => {
+    e.preventDefault();
+    if (!search.trim()) return;
+
+    setLoading(true);
+    setError(null);
+    setGifs([]);
+
+    try {
+      const response = await axios.get(`/api/gifs?query=${encodeURIComponent(search)}`);
+      const gifData = response.data.data.slice(0, 20);
+      setGifs(gifData);
+    } catch (err) {
+      console.error('Search error:', err);
+      setError('Failed to fetch GIFs. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-100 py-12 px-4">
+      <div className="max-w-7xl mx-auto">
+        <h1 className="text-3xl font-bold text-center mb-8 text-black">
+          Search Gif
+        </h1>
+
+        <form onSubmit={searchGifs} className="mb-8">
+          <div className="flex gap-2 justify-center">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="px-4 py-2 border rounded-md w-64 text-black placeholder-black"
+              placeholder="Search for GIFs..."
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
+              disabled={loading}
+            >
+              {loading ? 'Processing...' : 'Search'}
+            </button>
+          </div>
+        </form>
+
+        {error && (
+          <div className="text-red-500 text-center mb-4">{error}</div>
+        )}
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+          {gifs.map((gif) => (
+            <div key={gif.id} className="bg-white rounded-lg shadow-lg overflow-hidden">
+              <div className="p-2">
+                <img
+                  src={gif.images.fixed_width_small.url}
+                  alt={gif.title}
+                  className="w-full h-auto rounded"
+                  style={{ maxWidth: '200px', margin: '0 auto' }}
+                />
+              </div>
+              <div className="px-2 pb-2">
+                <button
+                  onClick={() => downloadGif(gif)}
+                  className="w-full px-2 py-1 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors flex items-center justify-center gap-1 text-sm"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                  Download
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </div>
     </div>
   );
 }
